@@ -1,0 +1,97 @@
+Name:                haskelm
+Version:             0.0.2
+Synopsis:            Elm to Haskell translation
+Description:         Library and binary to translate Haskell code into Elm code
+Homepage:            http://github.com/JoeyEremondi/haskelm
+
+License: BSD3
+License-file: LICENSE
+
+build-type:     Simple
+author:         Joey Eremondi
+Maintainer:     joey@eremondi.com
+Copyright:      Copyright: (c) 2014 Joey Eremondi
+
+Category: Compiler, Language
+Cabal-version:       >=1.9
+
+source-repository head
+  type: git
+  location: git://github.com/JoeyEremondi/haskelm
+  
+Library
+  exposed-modules:     Language.Elm.TH
+                       --Language.Elm.BuildString
+  hs-Source-Dirs:      src
+  other-modules:       SourceSyntax.Declaration,
+                       SourceSyntax.Expression,
+                       SourceSyntax.Helpers,
+                       SourceSyntax.Literal,
+                       SourceSyntax.Location,
+                       SourceSyntax.Module,
+                       SourceSyntax.Pattern,
+                       SourceSyntax.PrettyPrint,
+                       SourceSyntax.Type,
+                       Language.Elm.TH.HToE
+                       Language.Elm.TH.Json
+                       Language.Elm.TH.Util
+
+  Build-depends:       aeson,
+                       base >=4.2 && <5,
+                       containers >= 0.3,
+                       directory,
+                       mtl >= 2,
+                       parsec >= 3.1.1,
+                       pretty,
+                       text,
+                       unordered-containers,
+                       shakespeare,
+                       template-haskell,
+                       haskell-src-meta,
+                       vector,
+                       th-desugar,
+                       temporary,
+                       split,
+                       Elm,
+                       elm-build-lib,
+                       binary
+
+
+Executable haskelm
+  Main-is:             Haskelm.hs
+  hs-Source-Dirs:      src
+  other-modules:       SourceSyntax.Declaration,
+                       SourceSyntax.Expression,
+                       SourceSyntax.Helpers,
+                       SourceSyntax.Literal,
+                       SourceSyntax.Location,
+                       SourceSyntax.Module,
+                       SourceSyntax.Pattern,
+                       SourceSyntax.PrettyPrint,
+                       SourceSyntax.Type,
+                       Language.Elm.TH.HToE
+                       Language.Elm.TH.Json
+                       Language.Elm.TH.Util
+                       Language.Elm.TH
+                       --Language.Elm.BuildString
+                       
+  Build-depends:       aeson,
+                       base >=4.2 && <5,
+                       containers >= 0.3,
+                       directory,
+                       mtl >= 2,
+                       parsec >= 3.1.1,
+                       pretty,
+                       text,
+                       unordered-containers,
+                       shakespeare,
+                       template-haskell,
+                       haskell-src-meta,
+                       vector,
+                       th-desugar,
+                       temporary,
+                       split,
+                       Elm,
+                       elm-build-lib,
+                       binary
+
