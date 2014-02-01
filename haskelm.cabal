@@ -54,7 +54,8 @@ Library
                        split,
                        Elm,
                        elm-build-lib,
-                       binary
+                       binary,
+                       haskell-src-exts
 
 
 Executable haskelm
@@ -93,5 +94,6 @@ Executable haskelm
                        split,
                        Elm,
                        elm-build-lib,
-                       binary
+                       binary,
+                       haskell-src-exts
 

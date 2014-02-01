@@ -12,6 +12,8 @@ main = do
   (infile:_) <- getArgs
   source <- readFile infile
   result <- runQ $ do
-    decs <- stringToDecs source
-    toElmString "Main" decs  
+    let decs = decsFromString source
+    let options = Options True False [] "Main" ""
+    LitE (StringL str) <- elmStringExp options decs
+    return str
   putStrLn result
