@@ -101,3 +101,24 @@ Test-Suite test-haskelm
   Type:            exitcode-stdio-1.0
   Hs-Source-Dirs:  tests, src
   Main-is:         Main.hs
+  Build-depends:       aeson,
+                       base >=4.2 && <5,
+                       containers >= 0.3,
+                       directory,
+                       mtl >= 2,
+                       parsec >= 3.1.1,
+                       pretty,
+                       text,
+                       unordered-containers,
+                       shakespeare,
+                       template-haskell,
+                       haskell-src-meta,
+                       vector,
+                       th-desugar,
+                       temporary,
+                       split,
+                       Elm,
+                       elm-build-lib,
+                       binary,
+                       haskell-src-exts
+  ghc-options:         -ddump-splices
