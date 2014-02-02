@@ -48,3 +48,8 @@ notTheOrigin = Point {px=20, py=100, pz=0.1}
 alsoNotTheOrigin = notTheOrigin {px = 30, pz=10.3}
 
 origin = Point 0 0 0.0
+
+funInLet = 
+  let 
+    plus1 x = x + 1
+  in plus1 3

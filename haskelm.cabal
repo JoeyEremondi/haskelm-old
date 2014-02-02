@@ -53,7 +53,7 @@ Library
                        temporary,
                        split,
                        Elm,
-                       elm-build-lib,
+                       --elm-build-lib,
                        binary,
                        haskell-src-exts
 
@@ -93,7 +93,7 @@ Executable haskelm
                        temporary,
                        split,
                        Elm,
-                       elm-build-lib,
+                       --elm-build-lib,
                        binary,
                        haskell-src-exts
 
@@ -118,7 +118,7 @@ Test-Suite test-haskelm
                        temporary,
                        split,
                        Elm,
-                       elm-build-lib,
+                       --elm-build-lib,
                        binary,
                        haskell-src-exts
   ghc-options:         -ddump-splices

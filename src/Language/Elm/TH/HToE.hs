@@ -233,6 +233,15 @@ translateDef (ValD pat body whereDecs) = do
     let eBody = maybeLet eWhere decBody
     return $ E.Definition ePat (Lo.none eBody) Nothing
 
+--To do functions, we translate them into an Elm declaration
+--Then we convert
+translateDef (funD@(FunD _ _)) = do
+  elmDec <- translateDec funD
+  case elmDec of
+       [D.Definition elmDef] -> return elmDef
+       _ -> unImplemented "Function can't be converted to a declaration"
+  
+
 translateDef d = unImplemented "Non-simple function/value definitions"
 
 -- | Helper to put an object in a tuple with an empty list as snd
@@ -595,7 +604,6 @@ translateType (StarT) = unImplemented "star types"
 translateType (UnboxedTupleT i ) = translateType $ TupleT i
 translateType ArrowT = error "Arrow type: Should never recurse this far down"
 translateType ListT = error "List type: Should never recurse this far down"
-translateType ArrowT = error "Should never recurse this far down"
 translateType ConstraintT = unImplemented "Type constraints"
 translateType (LitT _) = error "Type literals"
 
@@ -642,11 +650,7 @@ translateType t = do
             etvar <- translateType tvar
             T.Data ctor varList <- translateType subt
             return $ T.Data ctor (varList ++ [etvar])                                           
-          --This case is guaranteed to be an error, but we get a better message if we recurse
-          (AppT t1 t2) -> do
-            elm1 <- translateType t1
-            elm2 <- translateType t2
-            return $ unImplemented $ "misc types "
+
 
             
 -- | Special record type translation
