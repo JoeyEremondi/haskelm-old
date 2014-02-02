@@ -7,6 +7,7 @@ module Language.Elm.TH
     decsFromString,
     decsFromFile,
     TranslateOptions (..),
+    defaultOptions,
     decsFromModuleString,
     decsFromModuleFile,
     toElmString
@@ -41,6 +42,8 @@ data TranslateOptions = Options {
  
 }
 
+defaultOptions = Options True False [] "Main" "var"
+
 
 -- | 'toElm' takes a 'String' module name and a list of Template Haskell declarations
 -- and generates a translated Elm AST module
@@ -52,7 +55,7 @@ toElm options decs = do
   let jsonDecs = fromJsonDecs ++ toJsonDecs
   sumDecs <- evalStateT  (Json.giantSumType decs) Util.defaultState
   elmDecs <- evalStateT  (concat <$> translateDecs (decs ++ jsonDecs ++ sumDecs)  ) Util.defaultState
-  return $ M.Module [varName options] [] (map (\im->(im, Importing [])) $ elmImports options) elmDecs 
+  return $ M.Module [moduleName options] [] (map (\im->(im, Importing [])) $ elmImports options) elmDecs 
 
 --Single stateful computation to store record state information  
 translateDecs decs = do
@@ -120,4 +123,7 @@ declareTranslation options dq = do
     
 
 elmStringExp :: TranslateOptions -> DecsQ -> ExpQ
-elmStringExp options decs = error "TODO"
+elmStringExp options decsQ = do
+  decs <- decsQ
+  elmString <- toElmString options decs
+  liftString elmString
