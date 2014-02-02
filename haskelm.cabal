@@ -1,5 +1,5 @@
 Name:                haskelm
-Version:             0.0.2
+Version:             0.0.3
 Synopsis:            Elm to Haskell translation
 Description:         Library and binary to translate Haskell code into Elm code
 Homepage:            http://github.com/JoeyEremondi/haskelm
@@ -35,6 +35,7 @@ Library
                        Language.Elm.TH.HToE
                        Language.Elm.TH.Json
                        Language.Elm.TH.Util
+                       Language.Elm.TH.BaseDecs
 
   Build-depends:       aeson,
                        base >=4.2 && <5,
