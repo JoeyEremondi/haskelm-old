@@ -1,3 +1,6 @@
+** 0.0.5
+Remove Elm dependency from lib and executable
+
 ** 0.0.4
 
 Remove Elm dependency
