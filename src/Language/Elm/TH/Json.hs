@@ -56,7 +56,7 @@ makeJsonCase1 (jCtor, varName, ctorName) = Match (ConP (mkName jCtor) [VarP (mkN
 unJsonCase :: [Match]
 unJsonCase = map makeJsonCase1 list1 ++ map makeJsonCase0 list0 ++ [intCase]
   where
-    list1 = [--("Array", "lst", "FromJSON_List"), --TODO can do types?
+    list1 = [--("Json.Array", "lst", "FromJSON_List"), --TODO can do types?
              ( sumTypePrefix ++"_Float", "n",  "Json.Number"),
              (sumTypePrefix ++"_String", "s", "Json.String"),
              (sumTypePrefix ++"_Bool", "b", "Json.Boolean")]
@@ -70,7 +70,7 @@ unJsonCase = map makeJsonCase1 list1 ++ map makeJsonCase0 list0 ++ [intCase]
 jsonCase :: [Match]
 jsonCase = map makeJsonCase1 list1 ++ map makeJsonCase0 list0 ++ [listCase]
   where
-    list1 = [--("Array", "lst", "FromJSON_List"), --TODO can do types?
+    list1 = [--("Json.Array", "lst", "FromJSON_List"), --TODO can do types?
              ("Json.Number", "n", sumTypePrefix ++"_Float"),
              ("Json.String", "s", sumTypePrefix ++"_String"),
              ("Json.Boolean", "b", sumTypePrefix ++"_Bool")]
@@ -347,21 +347,26 @@ toMatchForCtor typeName (RecC name vstList) = do
   let ret = AppE (VarE $ mkName "Json.Object") (VarE dictName)
   let body = NormalB $ LetE (jsonDecs ++ [dictDec]) ret
   return $ Match matchPat body []  
+
+dictExp :: Name -> [Name] -> SQ Exp
+dictExp ctorName jsonNames = do
+  let ctorExp = LitE $ StringL $ nameToString ctorName
+  let tagList = [TupE $ [LitE $ StringL "tag", AppE (VarE (mkName "Json.String")) ctorExp]]
+  let elemArray = AppE (VarE $ mkName "Json.Array" ) (ListE $ map VarE jsonNames)
+  let contentList = case jsonNames of
+        [] -> []
+        [elem] -> [TupE $ [LitE $ StringL "contents", VarE elem]]
+        _ -> [TupE $ [LitE $ StringL "contents", elemArray]]
+  return $ AppE (VarE $ mkName "Data.Map.fromList") (ListE $ tagList ++ contentList)
+
   
 -- | Generate the declaration of a dictionary mapping field names to values
 -- to be used with the JSON Object constructor
 makeDict :: Name -> Name -> Name -> [Name] -> SQ Dec    
 makeDict typeName ctorName dictName jsonNames = do
   let leftSide = VarP dictName
-  let jsonExps = map VarE jsonNames
-  let fieldNames = map (LitE . StringL . show) [1 .. (length jsonNames)]
-  let tuples = map (\(field, json) -> TupE [field, json]) (zip fieldNames jsonExps)
-  let typeExp = LitE $ StringL $ nameToString typeName
-  let ctorExp = LitE $ StringL $ nameToString ctorName
-  let typeTuple = TupE [LitE $ StringL "type", AppE (VarE (mkName "Json.String")) typeExp ]
-  let ctorTuple = TupE [LitE $ StringL "ctor", AppE (VarE (mkName "Json.String")) ctorExp ]
-  let tupleList = ListE $ [typeTuple, ctorTuple] ++ tuples
-  let rightSide = NormalB $ AppE (VarE $ mkName "Data.Map.fromList") tupleList
+  rsExp <- dictExp ctorName jsonNames
+  let rightSide = NormalB rsExp 
   return $ ValD leftSide rightSide []
   
  -- |Generate the Match which matches against the BoxedJson constructor
