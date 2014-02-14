@@ -49,6 +49,7 @@ import qualified Control.Monad.State as S
 applyArgs :: Exp -> [Exp] -> Exp
 applyArgs fun args = foldl (\ accumFun nextArg -> AppE accumFun nextArg) fun args
 
+fnComp = VarE $ mkName "."
 
 -- | Filter function to test if a dec is a data
 -- Also filters out decs which types that can't be serialized, such as functions
@@ -97,10 +98,36 @@ makeFromJson allDecs = do
 -- | Given a type, and an expression for an argument of type Json
 -- return the expression which applies the proper fromJson function to that expression
 fromJsonForType :: Type -> SQ Exp
-fromJsonForType t = do
-  --lookup t in state
-  dec <- error "TODO implement dec lookup from type"
-  return $ error "TODO implement dec lookup from type"
+
+--Type name not covered by Prelude
+fromJsonForType (ConT name) = case (nameToString name) of
+  "Int" -> return $ VarE $ mkName "JsonUtil.intFromJson"
+  "Int" -> return $ VarE $ mkName "JsonUtil.floatFromJson"
+  "String" -> return $ VarE $ mkName "JsonUtil.stringFromJson"
+  _ -> return $ VarE $ fromJsonName name
+
+fromJsonForType (AppT ListT t) = do
+  subExp <- fromJsonForType t
+  return $ AppE (VarE $ mkName "JsonUtil.listFromJson") subExp  
+  
+fromJsonForType (AppT (ConT name) t) = do
+  subExp <- fromJsonForType t
+  case (nameToString name) of
+    "Maybe" -> return $ AppE (VarE $ mkName "JsonUtil.maybeFromJson") subExp
+    
+fromJsonForType t
+  | isTupleType t = do
+      let tList = tupleTypeToList t
+      let n = length tList
+      --Generate the lambda to convert the list into a tuple
+      subFunList <- mapM fromJsonForType tList
+      argNames <- mapM (liftNewName . ("x" ++) . show) [1 .. n]
+      let argValues = map VarE argNames
+      let argPat = ListP $ map VarP argNames
+      let lambdaBody = TupE $ zipWith AppE subFunList argValues
+      let lambda = LamE [argPat] lambdaBody
+      let makeList = VarE $ mkName "makeList"
+      return $ InfixE (Just lambda) fnComp (Just makeList)
 
 -- |Given a type declaration, generate the function declaration
 -- Which takes a Json object to a value of that type
@@ -158,7 +185,20 @@ makeToJson allDecs = do
   mapM toJsonForDec decs
 
 toJsonForType :: Type -> SQ Exp
-toJsonForType t = error "TODO implement toJson for types"
+toJsonForType (ConT name) = case (nameToString name) of
+  "Int" -> return $ VarE $ mkName "JsonUtil.intToJson"
+  "Int" -> return $ VarE $ mkName "JsonUtil.floatToJson"
+  "String" -> return $ VarE $ mkName "JsonUtil.stringToJson"
+  _ -> return $ VarE $ toJsonName name
+  
+toJsonForType (AppT ListT t) = do
+  subExp <- toJsonForType t
+  return $ AppE (VarE $ mkName "JsonUtil.listToJson") subExp  
+  
+toJsonForType (AppT (ConT name) t) = do
+  subExp <- toJsonForType t
+  case (nameToString name) of
+    "Maybe" -> return $ AppE (VarE $ mkName "JsonUtil.maybeToJson") subExp
 
 toJsonForDec :: Dec -> SQ Dec
 toJsonForDec dec@(DataD _ name _ ctors _deriving) = do

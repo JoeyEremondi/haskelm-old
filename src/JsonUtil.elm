@@ -34,3 +34,21 @@ maybeFromJson : FromJson a -> FromJson (Maybe a)
 maybeFromJson fromJson = \json -> case json of
   Json.Null -> Nothing
   _ -> Just <| fromJson json
+  
+intFromJson : FromJson Int
+intFromJson (Number f) = round f
+
+intToJson : ToJson Int
+intToJson i = Json.Number <| toFloat i
+
+floatFromJson : FromJson Float
+floatFromJson (Json.Number f) = f
+
+floatToJson : ToJson Float
+floatToJson = Json.Number
+
+stringFromJson : FromJson String
+stringFromJson (String s) = s
+
+stringToJson : FromJson String
+stringToJson = Json.String
