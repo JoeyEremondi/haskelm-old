@@ -98,7 +98,7 @@ jsonArgExp :: Exp
 jsonArgExp = VarE jsonArgName
 
 fromJsonName :: Name -> Name
-fromJsonName name = mkName $ "toJson_" ++ nameToString name
+fromJsonName name = mkName $ "fromJson_" ++ nameToString name
 
 toJsonName :: Name -> Name
 toJsonName name = mkName $ "toJson_" ++ nameToString name
@@ -163,7 +163,7 @@ fromJsonForDec (NewtypeD cxt name tyBindings  ctor nameList) =
 fromJsonForDec dec@(TySynD name _tyvars ty) = do
   let fnName = fromJsonName name
   fnBody <- NormalB <$> fromJsonForType ty
-  let fnClause = Clause [jsonArgPat] fnBody []
+  let fnClause = Clause [] fnBody []
   return $ FunD fnName [fnClause]
   
   
@@ -277,7 +277,7 @@ toJsonForDec (NewtypeD cxt name tyBindings  ctor nameList) =
 toJsonForDec dec@(TySynD name _tyvars ty) = do
   let fnName = toJsonName name
   fnBody <- NormalB <$> toJsonForType ty
-  let fnClause = Clause [jsonArgPat] fnBody []
+  let fnClause = Clause [] fnBody []
   return $ FunD fnName [fnClause]
  
 toJsonForDec dec = error $ "Unknown dec type" ++ (show dec)

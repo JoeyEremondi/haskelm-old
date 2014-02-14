@@ -179,7 +179,7 @@ decsFromModuleFile filePath = do
 
 elmModuleToString (Module [name] exports imports elmDecs ) =
   let allDecs = baseDecs ++ elmDecs 
-      allImports = imports ++ [("Json", M.As "Json"), ("Dict", M.As "Dict")]
+      allImports = imports ++ [("Json", M.As "Json"), ("Dict", M.As "Dict"), ("JsonUtil", M.As "JsonUtil")]
       newModule = Module [name] exports allImports allDecs
       modString = show $ Pretty.pretty newModule
   in modString              

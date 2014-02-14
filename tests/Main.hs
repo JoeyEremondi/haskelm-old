@@ -45,4 +45,5 @@ accessDecs (Local1 x) = Local2 (show x)
 main = do
   putStrLn "Generated elm strings:"
   mapM_ putStrLn [elmString1, elmString2, elmString3]
+  writeFile "src/Test.elm" elmString3
   return ()
