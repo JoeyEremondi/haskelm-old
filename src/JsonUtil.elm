@@ -36,7 +36,7 @@ maybeFromJson fromJson = \json -> case json of
   _ -> Just <| fromJson json
   
 intFromJson : FromJson Int
-intFromJson (Number f) = round f
+intFromJson (Json.Number f) = round f
 
 intToJson : ToJson Int
 intToJson i = Json.Number <| toFloat i
@@ -48,7 +48,11 @@ floatToJson : ToJson Float
 floatToJson = Json.Number
 
 stringFromJson : FromJson String
-stringFromJson (String s) = s
+stringFromJson (Json.String s) = s
 
-stringToJson : FromJson String
-stringToJson = Json.String
+stringToJson : ToJson String
+stringToJson s = Json.String s
+
+getTag : Json.JsonValue -> String
+getTag (Json.Object dict) = case (Dict.lookup "tag" dict) of
+  Just (Json.String s) -> s

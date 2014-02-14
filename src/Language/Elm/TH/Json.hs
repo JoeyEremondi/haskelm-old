@@ -134,7 +134,7 @@ fromJsonForType t
 fromJsonForDec :: Dec -> SQ Dec
 
 fromJsonForDec dec@(DataD _ name _ ctors _deriving) = do
-  let argTagExpression = error "TODO add Exp for getting tag from arg"
+  let argTagExpression = AppE (VarE $ mkName "JsonUtil.getTag") jsonArgExp
   ctorMatches <- mapM fromMatchForCtor ctors
   let fnExp = CaseE argTagExpression ctorMatches
   let argPat = jsonArgPat
@@ -145,6 +145,13 @@ fromJsonForDec dec@(DataD _ name _ ctors _deriving) = do
 
 fromJsonForDec (NewtypeD cxt name tyBindings  ctor nameList) = 
   fromJsonForDec $ DataD cxt name tyBindings [ctor] nameList
+  
+fromJsonForDec dec@(TySynD name _tyvars ty) = do
+  let fnName = fromJsonName name
+  fnBody <- NormalB <$> fromJsonForType ty
+  let fnClause = Clause [jsonArgPat] fnBody []
+  return $ FunD fnName [fnClause]
+  
   
 fromMatchForCtor :: Con -> SQ Match
 
@@ -168,7 +175,7 @@ fromMatchForCtor (NormalC name strictTypes) = do
   let rightHandSide = NormalB $ applyArgs ctorExp unJsonedExprList
   return $ Match leftHandSide rightHandSide []
 
-fromMatchForCtor _ = error "TODO implement constructor match generation"
+fromMatchForCtor _ = error "TODO implement record match generation"
 
 unpackContents :: Exp -> SQ Exp
 unpackContents jsonValue = return $ AppE (VarE $ mkName "JsonUtil.unpackContents") jsonValue
@@ -200,6 +207,19 @@ toJsonForType (AppT (ConT name) t) = do
   case (nameToString name) of
     "Maybe" -> return $ AppE (VarE $ mkName "JsonUtil.maybeToJson") subExp
 
+toJsonForType t 
+  | isTupleType t = do
+      let tList = tupleTypeToList t
+      let n = length tList
+      --Generate the lambda to convert the list into a tuple
+      subFunList <- mapM toJsonForType tList
+      argNames <- mapM (liftNewName . ("x" ++) . show) [1 .. n]
+      let argValues = map VarE argNames
+      let argPat = TupP $ map VarP argNames
+      --Get each tuple element as Json, then wrap them in a Json Array
+      let listExp = AppE (VarE $ mkName "Json.Array") (ListE $ zipWith AppE subFunList argValues)
+      return $ LamE [argPat] listExp  
+
 toJsonForDec :: Dec -> SQ Dec
 toJsonForDec dec@(DataD _ name _ ctors _deriving) = do
   let argPat = jsonArgPat
@@ -211,6 +231,12 @@ toJsonForDec dec@(DataD _ name _ ctors _deriving) = do
   let fnName = toJsonName name
   let fnBody = NormalB fnExp
   let fnClause = Clause [argPat] fnBody []
+  return $ FunD fnName [fnClause]
+  
+toJsonForDec dec@(TySynD name _tyvars ty) = do
+  let fnName = toJsonName name
+  fnBody <- NormalB <$> toJsonForType ty
+  let fnClause = Clause [jsonArgPat] fnBody []
   return $ FunD fnName [fnClause]
   
 toMatchForCtor :: Con -> SQ Match
