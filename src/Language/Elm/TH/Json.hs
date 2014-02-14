@@ -43,6 +43,10 @@ import Control.Applicative
 import Control.Monad.State (StateT)
 import qualified Control.Monad.State as S
 
+--Helper function to apply arguments to a function
+applyArgs :: Exp -> [Exp] -> Exp
+applyArgs fun args = foldl (\ accumFun nextArg -> AppE accumFun nextArg) fun args
+
 --General helper functions
 jsonArgName :: Name
 jsonArgName = mkName "jsonArg"
@@ -53,12 +57,13 @@ jsonArgPat = VarP jsonArgName
 fromJsonName :: Name -> Name
 fromJsonName name = mkName $ "fromJson_" ++ nameToString name
 
-
-fromJsonForType :: Type -> SQ Dec
+-- | Given a type, and an expression for an argument of type Json
+-- return the expression which applies the proper fromJson function to that expression
+fromJsonForType :: Type -> SQ Exp
 fromJsonForType t = do
   --lookup t in state
   dec <- error "TODO implement dec lookup from type"
-  fromJsonForDec dec
+  return $ error "TODO implement dec lookup from type"
 
 -- |Given a type declaration, generate the function declaration
 -- Which takes a Json object to a value of that type
@@ -73,8 +78,21 @@ fromJsonForDec dec@(DataD _ name _ ctors _deriving) = do
   let fnBody = NormalB fnExp
   let fnClause = Clause [argPat] fnBody []
   return $ FunD fnName [fnClause]
+
+fromJsonForDec (NewtypeD cxt name tyBindings  ctor nameList) = 
+  fromJsonForDec $ DataD cxt name tyBindings [ctor] nameList
   
 fromMatchForCtor :: Con -> SQ Match
+
+fromMatchForCtor (NormalC name strictTypes) = do
+  let types = map snd strictTypes
+  let leftHandSide = LitP $ StringL $ nameToString name
+  
+  let ctorExp = VarE name
+  argExps <- mapM fromJsonForType types
+  let rightHandSide = NormalB $ applyArgs ctorExp argExps
+  return $ Match leftHandSide rightHandSide []
+
 fromMatchForCtor _ = error "TODO implement constructor match generation"
 
 makeFromJson = error "TODO implement making json"
