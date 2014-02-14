@@ -132,8 +132,8 @@ toElm options decs = do
   fromJsonDecs <- if doJson then evalStateT  (Json.makeFromJson decs) Util.defaultState else return []
   toJsonDecs <- if doJson then evalStateT  (Json.makeToJson decs) Util.defaultState else return []
   let jsonDecs = fromJsonDecs ++ toJsonDecs
-  sumDecs <- evalStateT  (Json.giantSumType decs) Util.defaultState
-  elmDecs <- evalStateT  (concat <$> translateDecs (decs ++ jsonDecs ++ sumDecs)  ) Util.defaultState
+  --sumDecs <- evalStateT  (Json.giantSumType decs) Util.defaultState
+  elmDecs <- evalStateT  (concat <$> translateDecs (decs ++ jsonDecs)  ) Util.defaultState
   return $ M.Module [moduleName options] [] (map (\im->(im, Importing [])) $ elmImports options) elmDecs 
 
 --Single stateful computation to store record state information  
