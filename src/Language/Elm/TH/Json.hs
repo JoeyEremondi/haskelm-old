@@ -51,6 +51,20 @@ applyArgs fun args = foldl (\ accumFun nextArg -> AppE accumFun nextArg) fun arg
 
 fnComp = VarE $ mkName "."
 
+-- | Helper function to generate a the names X1 .. Xn with some prefix X  
+nNames :: Int -> String -> SQ [Name]
+nNames n base = do
+  let varStrings = map (\n -> base ++ show n) [1..n]
+  mapM liftNewName varStrings
+
+-- | Variable for the getter function getting the nth variable from a Json
+varNamed :: Exp
+varNamed = VarE (mkName "JsonUtil.varNamed")
+  
+-- | Expression getting a named subvariable from a JSON object
+getVarNamed :: String -> Exp
+getVarNamed nstr = AppE (AppE varNamed jsonArgExp ) (LitE $ StringL nstr)
+
 -- | Filter function to test if a dec is a data
 -- Also filters out decs which types that can't be serialized, such as functions
 isData :: Dec -> Bool
@@ -174,9 +188,33 @@ fromMatchForCtor (NormalC name strictTypes) = do
   
   let rightHandSide = NormalB $ applyArgs ctorExp unJsonedExprList
   return $ Match leftHandSide rightHandSide []
+  
 
-fromMatchForCtor _ = error "TODO implement record match generation"
+fromMatchForCtor (RecC name vstList) = do
+  let nameTypes = map (\(a,_,b)->(nameToString a,b)) vstList
+  let matchPat = LitP $ StringL $ nameToString name
+  (subNames, subDecs) <- unzip <$> mapM getSubJsonRecord nameTypes
+  let body = NormalB $ if null subNames
+              then applyArgs subNames ctorExp
+              else LetE subDecs (applyArgs subNames ctorExp)
+  return $ Match matchPat body []
+  where
+    ctorExp = ConE name
+    applyArgs t accum = foldl (\ accum h -> AppE accum (VarE h)) accum t
+    
 
+-- | Generate a declaration, and a name bound in that declaration,
+-- Which unpacks a value of the given type from the nth field of a JSON object
+getSubJsonRecord :: (String, Type) -> SQ (Name, Dec)
+-- We need special cases for lists and tuples, to unpack them
+--TODO recursive case
+getSubJsonRecord (field, t) = do
+  funToApply <- fromJsonForType t
+  subName <- liftNewName "subVar"
+  let subLeftHand = VarP subName
+  let subRightHand = NormalB $ AppE funToApply (getVarNamed field)
+  return (subName, ValD subLeftHand subRightHand [])
+    
 unpackContents :: Exp -> SQ Exp
 unpackContents jsonValue = return $ AppE (VarE $ mkName "JsonUtil.unpackContents") jsonValue
 
@@ -233,11 +271,17 @@ toJsonForDec dec@(DataD _ name _ ctors _deriving) = do
   let fnClause = Clause [argPat] fnBody []
   return $ FunD fnName [fnClause]
   
+toJsonForDec (NewtypeD cxt name tyBindings  ctor nameList) = 
+  toJsonForDec $ DataD cxt name tyBindings [ctor] nameList
+  
 toJsonForDec dec@(TySynD name _tyvars ty) = do
   let fnName = toJsonName name
   fnBody <- NormalB <$> toJsonForType ty
   let fnClause = Clause [jsonArgPat] fnBody []
   return $ FunD fnName [fnClause]
+ 
+toJsonForDec dec = error $ "Unknown dec type" ++ (show dec)
+
   
 toMatchForCtor :: Con -> SQ Match
 toMatchForCtor (NormalC name strictTypes) = do
@@ -258,6 +302,47 @@ toMatchForCtor (NormalC name strictTypes) = do
   let rightHandSide = NormalB  jsonValueExp
   
   return $ Match  leftHandSide rightHandSide []
+
+toMatchForCtor (RecC name vstList) = do
+  let (adtNames, _, types) = unzip3 vstList
+  let n = length types
+  jsonNames <- nNames n "jsonVar"
+  let adtPats = map VarP adtNames
+  let matchPat = ConP name adtPats
+  jsonDecs <- mapM makeSubJsonRecord (zip3 types adtNames jsonNames)
+  dictName <- liftNewName "objectDict"
+  dictDec <-  makeRecordDict name dictName jsonNames
+  let ret = AppE (VarE $ mkName "Json.Object") (VarE dictName)
+  let body = NormalB $ LetE (jsonDecs ++ [dictDec]) ret
+  return $ Match matchPat body []
+ 
+-- | Generate the declaration of a dictionary mapping field names to values
+-- to be used with the JSON Object constructor
+makeRecordDict :: Name -> Name -> [Name] -> SQ Dec
+makeRecordDict ctorName dictName jsonNames = do
+  let leftSide = VarP dictName
+  let jsonExps = map VarE jsonNames
+  let fieldNames = map (LitE . StringL . show) [1 .. (length jsonNames)]
+  let tuples = map (\(field, json) -> TupE [field, json]) (zip fieldNames jsonExps)
+
+  let ctorExp = LitE $ StringL $ nameToString ctorName
+
+  let ctorTuple = TupE [LitE $ StringL "tag", AppE (VarE (mkName "Json.String")) ctorExp ]
+  let tupleList = ListE $ [ctorTuple] ++ tuples
+  let rightSide = NormalB $ AppE (VarE $ mkName "Data.Map.fromList") tupleList
+  return $ ValD leftSide rightSide []
+  
+
+-- | Generate the declaration of a value converted to Json
+-- given the name of an ADT value to convert
+makeSubJsonRecord :: (Type, Name, Name) -> SQ Dec
+-- We need special cases for lists and tuples, to unpack them
+--TODO recursive case
+makeSubJsonRecord (t, adtName, jsonName) = do
+  funToApply <- toJsonForType t
+  let subLeftHand = VarP jsonName
+  let subRightHand = NormalB $ AppE funToApply (VarE adtName)
+  return $ ValD subLeftHand subRightHand []
   
 packContents :: Name -> Exp -> SQ Exp
 packContents name contentList = do
