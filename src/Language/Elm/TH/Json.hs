@@ -40,6 +40,8 @@ import Language.Elm.TH.Util
 
 import Control.Applicative
 
+import Control.Monad
+
 import Control.Monad.State (StateT)
 import qualified Control.Monad.State as S
 
@@ -86,9 +88,15 @@ fromJsonName name = mkName $ "toJson_" ++ nameToString name
 toJsonName :: Name -> Name
 toJsonName name = mkName $ "toJson_" ++ nameToString name
 
+
+makeFromJson :: [Dec] -> SQ [Dec]
+makeFromJson allDecs = do
+  let decs = filter isData allDecs
+  mapM fromJsonForDec decs
+
 -- | Given a type, and an expression for an argument of type Json
 -- return the expression which applies the proper fromJson function to that expression
-fromJsonForType :: Type -> SQ Exp
+fromJsonForType :: Type -> Exp -> SQ Exp
 fromJsonForType t = do
   --lookup t in state
   dec <- error "TODO implement dec lookup from type"
@@ -99,7 +107,7 @@ fromJsonForType t = do
 fromJsonForDec :: Dec -> SQ Dec
 
 fromJsonForDec dec@(DataD _ name _ ctors _deriving) = do
-  let argTagExpression = error "TODO add expr for getting tag from arg"
+  let argTagExpression = error "TODO add Exp for getting tag from arg"
   ctorMatches <- mapM fromMatchForCtor ctors
   let fnExp = CaseE argTagExpression ctorMatches
   let argPat = jsonArgPat
@@ -118,25 +126,30 @@ fromMatchForCtor (NormalC name strictTypes) = do
   let leftHandSide = LitP $ StringL $ nameToString name
   
   let ctorExp = VarE name
-  argExps <- mapM fromJsonForType types
+  
+  subDataExprs <- unpackContents jsonArgExp
+  
+  argExps <- zipWithM fromJsonForType types subDataExprs
   let rightHandSide = NormalB $ applyArgs ctorExp argExps
   return $ Match leftHandSide rightHandSide []
 
 fromMatchForCtor _ = error "TODO implement constructor match generation"
 
-makeFromJson :: [Dec] -> SQ [Dec]
-makeFromJson allDecs = do
+unpackContents :: Exp -> SQ [Exp]
+unpackContents jsonValue = error "TODO implement packing contents into json"
+
+
+  
+  
+  
+  
+  
+
+makeToJson allDecs = do
   let decs = filter isData allDecs
-  mapM fromJsonForDec decs
-  
-  
-  
-  
-  
+  mapM toJsonForDec decs
 
-makeToJson = error "TODO implement making json"
-
-toJsonForType :: Type -> SQ Exp
+toJsonForType :: Type -> Exp -> SQ Exp
 toJsonForType t = error "TODO implement toJson for types"
 
 toJsonForDec :: Dec -> SQ Dec
@@ -153,4 +166,23 @@ toJsonForDec dec@(DataD _ name _ ctors _deriving) = do
   return $ FunD fnName [fnClause]
   
 toMatchForCtor :: Con -> SQ Match
-toMatchForCtor con = error "TODO to matches for ctors"
+toMatchForCtor (NormalC name strictTypes) = do
+  let types = map snd strictTypes
+  let numStrings = map (("subVar_" ++) . show) [1 .. length types]
+  subDataNames <- mapM liftNewName numStrings
+  let subDataPats = map VarP subDataNames
+  
+  let leftHandSide = ConP name subDataPats
+  
+  let subDataExprs = map VarE subDataNames
+  contentsList <- zipWithM toJsonForType types subDataExprs
+  
+  jsonValueExp <- packContents name contentsList
+  let rightHandSide = NormalB  jsonValueExp
+  
+  return $ Match  leftHandSide rightHandSide []
+  
+packContents :: Name -> [Exp] -> SQ Exp
+packContents name contentList = error "TODO implement packing contents into json"
+  
+  
