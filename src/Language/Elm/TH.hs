@@ -81,15 +81,9 @@ Switching off JSON translations in the Haskelm executable will be supported soon
 
 module Language.Elm.TH
     ( 
-    declareTranslation,
-    elmStringExp,
-    decsFromString,
-    decsFromFile,
+    translateToElm,
     TranslateOptions (..),
     defaultOptions,
-    decsFromModuleString,
-    decsFromModuleFile,
-    toElmString
 
     ) where
 
@@ -114,14 +108,11 @@ import qualified Language.Haskell.Exts.Syntax as Exts
 
 data TranslateOptions = Options {
  makeJson :: Bool,
- declareHaskell :: Bool,
  elmImports :: [String],
- moduleName :: String,
- varName :: String 
- 
+ moduleName :: String
 }
 
-defaultOptions = Options True False [] "Main" "var"
+defaultOptions = Options True [] "Main"
 
 
 -- | 'toElm' takes a 'String' module name and a list of Template Haskell declarations
@@ -147,20 +138,12 @@ toElmString :: TranslateOptions -> [Dec] -> Q String
 toElmString options decs = elmModuleToString <$> toElm options decs
   
 
-
 -- | Translate a Haskell string into a list of Template-Haskell declarations
 decsFromString :: String -> Q [Dec]
 decsFromString s = case parseDecs s of
     Left e -> error $ "Failed to parse module\n" ++ e
     Right decs -> return decs
 
-
--- | Given a file containing Haskell declarations, splice them and
--- into the haskell code, while also translating them into an Elm module
-decsFromFile :: String -> DecsQ
-decsFromFile filePath = do
-  decString <- runIO $ readFile filePath
-  decsFromString decString
   
 --TODO also generate options?
 decsFromModuleString :: String -> DecsQ
@@ -184,25 +167,10 @@ elmModuleToString (Module [name] exports imports elmDecs ) =
       modString = show $ Pretty.pretty newModule
   in modString              
                
--- | Given haskell declarations wrapped in '[d| ... |]', splice them and
--- into the haskell code, while also translating them into an Elm module
--- stored with the given varName
-declareTranslation :: TranslateOptions -> DecsQ -> DecsQ
-declareTranslation options dq = do
-    decs <- dq
-    elmString <- toElmString options decs
-    let elmExp = liftString elmString
-    let pat = varP (mkName $ varName options)
-    let body = normalB elmExp
-    elmDec <- valD pat body []
-    --let modul = moduleFromString (TS.pack $ moduleName options) (TS.pack elmString )
-    --js <- runIO $ buildModules modul []
-
-    return $ if (declareHaskell options) then decs ++ [elmDec] else [elmDec]
     
 
-elmStringExp :: TranslateOptions -> DecsQ -> ExpQ
-elmStringExp options decsQ = do
-  decs <- decsQ
+translateToElm :: TranslateOptions -> String -> ExpQ
+translateToElm options filePath = do
+  decs <- decsFromModuleFile filePath
   elmString <- toElmString options decs
   liftString elmString

@@ -10,10 +10,8 @@ import Language.Haskell.TH
 
 main = do
   (infile:_) <- getArgs
-  source <- readFile infile
   result <- runQ $ do
-    let decs = decsFromString source
-    let options = Options True False [] "Main" ""
-    LitE (StringL str) <- elmStringExp options decs
+    let options = Options True [] "Main"
+    LitE (StringL str) <- translateToElm options infile
     return str
   putStrLn result
