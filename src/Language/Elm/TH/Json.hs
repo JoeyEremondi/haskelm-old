@@ -253,8 +253,8 @@ toJsonForType (ConT name) = case (nameToString name) of
   _ -> return $ VarE $ toJsonName name
   
 toJsonForType (AppT (AppT (ConT name) t1) t2) = do
-  sub1 <- fromJsonForType t1
-  sub2 <- fromJsonForType t2
+  sub1 <- toJsonForType t1
+  sub2 <- toJsonForType t2
   case (nameToString name) of
     "Data.Map.Map" -> return $ applyArgs (VarE $ mkName "JsonUtil.dictToJson") [sub1, sub2]
     s -> error  $ "Unsupported json type " ++ s
