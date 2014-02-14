@@ -170,7 +170,7 @@ instance Pretty Def where
   pretty (Definition pattern expr maybeTipe) =
       P.vcat [ annotation, definition ]
       where
-        definition = pretty pattern <+> P.equals <+> pretty expr
+        definition = (P.parens $ pretty pattern) <+> P.equals <+> pretty expr
         annotation = case maybeTipe of
                        Nothing -> P.empty
                        Just tipe -> pretty pattern <+> P.colon <+> pretty tipe

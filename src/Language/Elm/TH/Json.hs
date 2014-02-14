@@ -116,7 +116,8 @@ fromJsonForType :: Type -> SQ Exp
 --Type name not covered by Prelude
 fromJsonForType (ConT name) = case (nameToString name) of
   "Int" -> return $ VarE $ mkName "JsonUtil.intFromJson"
-  "Int" -> return $ VarE $ mkName "JsonUtil.floatFromJson"
+  "Float" -> return $ VarE $ mkName "JsonUtil.floatFromJson"
+  "Double" -> return $ VarE $ mkName "JsonUtil.floatFromJson"
   "String" -> return $ VarE $ mkName "JsonUtil.stringFromJson"
   _ -> return $ VarE $ fromJsonName name
 
@@ -176,17 +177,21 @@ fromMatchForCtor (NormalC name strictTypes) = do
   let ctorExp = VarE name
   
   --Exp in TH, list in Haskell
-  contentListExpr <- unpackContents jsonArgExp
+  contentListExpr <- NormalB <$> unpackContents jsonArgExp
   
   fromJsonFunctions <- mapM fromJsonForType types
-  let intNames = map show [1 .. length types]
+  let intNames = map (("subVar" ++) . show) [1 .. length types]
   subDataNames <- mapM liftNewName intNames
   --We unpack each json var into its own named variable, so we can unpack them into different types
   let subDataListPattern = ListP $ map VarP subDataNames
   
-  let unJsonedExprList = zipWith AppE fromJsonFunctions (map VarE subDataNames)
+  --let subDataExprs = map VarE subDataNames
   
-  let rightHandSide = NormalB $ applyArgs ctorExp unJsonedExprList
+  let unJsonedExprList =   zipWith AppE fromJsonFunctions (map VarE subDataNames)
+  
+  let letExp = LetE [ValD subDataListPattern contentListExpr []] (applyArgs ctorExp unJsonedExprList)
+  
+  let rightHandSide = NormalB $ letExp
   return $ Match leftHandSide rightHandSide []
   
 
@@ -232,7 +237,8 @@ makeToJson allDecs = do
 toJsonForType :: Type -> SQ Exp
 toJsonForType (ConT name) = case (nameToString name) of
   "Int" -> return $ VarE $ mkName "JsonUtil.intToJson"
-  "Int" -> return $ VarE $ mkName "JsonUtil.floatToJson"
+  "Float" -> return $ VarE $ mkName "JsonUtil.floatToJson"
+  "Double" -> return $ VarE $ mkName "JsonUtil.floatToJson"
   "String" -> return $ VarE $ mkName "JsonUtil.stringToJson"
   _ -> return $ VarE $ toJsonName name
   

@@ -56,3 +56,7 @@ stringToJson s = Json.String s
 getTag : Json.JsonValue -> String
 getTag (Json.Object dict) = case (Dict.lookup "tag" dict) of
   Just (Json.String s) -> s
+  
+varNamed : Json.JsonValue -> String -> Json.JsonValue
+varNamed (Json.Object dict) name = case (Dict.lookup name dict) of
+  Just j -> j
