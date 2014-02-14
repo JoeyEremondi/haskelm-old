@@ -96,7 +96,7 @@ translateCtor (RecC name vstList) =  do
   --ignore strictness
   let nameTypes = map (\(a,_,b)->(a,b)) vstList
   recordTy <- translateRecord nameTypes
-  let recordDecs = map (accessorDec . fst) nameTypes
+  let recordDecs = map ((accessorDec name). fst) nameTypes
   let makerDec = recordMakerDec (nameToElmString name) (map (nameToElmString . fst) nameTypes)
   let unboxDec = recordUnboxDec (nameToElmString name)
   return ( (nameToElmString name, [recordTy]), (makerDec:unboxDec:recordDecs)) --TODO add decs 
@@ -662,14 +662,14 @@ translateRecord nameTyList = do
   return $ T.recordOf $ zip eNames eTypes
   
 --Generate the function declarations associated with a record type
-accessorDec :: Name -> D.Declaration
+accessorDec :: Name -> Name -> D.Declaration
 --Names are always local
-accessorDec name = 
+accessorDec ctor name = 
   let
     nameString = nameToString name
     var = "rec"
     varExp = E.Var var
-    varPat = P.PVar var
+    varPat = P.PData (nameToString ctor) [P.PVar var]
     funBody = E.Access (Lo.none $ varExp) nameString
     fun = E.Lambda varPat (Lo.none funBody)
   in D.Definition $ E.Definition (P.PVar nameString) (Lo.none fun) Nothing

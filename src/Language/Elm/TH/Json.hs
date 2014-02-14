@@ -116,6 +116,7 @@ fromJsonForType :: Type -> SQ Exp
 --Type name not covered by Prelude
 fromJsonForType (ConT name) = case (nameToString name) of
   "Int" -> return $ VarE $ mkName "JsonUtil.intFromJson"
+  "Bool" -> return $ VarE $ mkName "JsonUtil.boolFromJson"
   "Float" -> return $ VarE $ mkName "JsonUtil.floatFromJson"
   "Double" -> return $ VarE $ mkName "JsonUtil.floatFromJson"
   "String" -> return $ VarE $ mkName "JsonUtil.stringFromJson"
@@ -130,6 +131,13 @@ fromJsonForType (AppT (ConT name) t) = do
   case (nameToString name) of
     "Maybe" -> return $ AppE (VarE $ mkName "JsonUtil.maybeFromJson") subExp
     
+fromJsonForType (AppT (AppT (ConT name) t1) t2) = do
+  sub1 <- fromJsonForType t1
+  sub2 <- fromJsonForType t2
+  case (nameToString name) of
+    "Data.Map.Map" -> return $ applyArgs (VarE $ mkName "JsonUtil.dictFromJson") [sub1, sub2]
+    s -> error  $ "Unsupported json type " ++ s
+    
 fromJsonForType t
   | isTupleType t = do
       let tList = tupleTypeToList t
@@ -143,6 +151,7 @@ fromJsonForType t
       let lambda = LamE [argPat] lambdaBody
       let makeList = VarE $ mkName "makeList"
       return $ InfixE (Just lambda) fnComp (Just makeList)
+   | otherwise = error $ "Can't make Json for type " ++ (show t) 
 
 -- |Given a type declaration, generate the function declaration
 -- Which takes a Json object to a value of that type
@@ -237,10 +246,19 @@ makeToJson allDecs = do
 toJsonForType :: Type -> SQ Exp
 toJsonForType (ConT name) = case (nameToString name) of
   "Int" -> return $ VarE $ mkName "JsonUtil.intToJson"
+  "Bool" -> return $ VarE $ mkName "JsonUtil.boolToJson"
   "Float" -> return $ VarE $ mkName "JsonUtil.floatToJson"
   "Double" -> return $ VarE $ mkName "JsonUtil.floatToJson"
   "String" -> return $ VarE $ mkName "JsonUtil.stringToJson"
   _ -> return $ VarE $ toJsonName name
+  
+toJsonForType (AppT (AppT (ConT name) t1) t2) = do
+  sub1 <- fromJsonForType t1
+  sub2 <- fromJsonForType t2
+  case (nameToString name) of
+    "Data.Map.Map" -> return $ applyArgs (VarE $ mkName "JsonUtil.dictToJson") [sub1, sub2]
+    s -> error  $ "Unsupported json type " ++ s
+    
   
 toJsonForType (AppT ListT t) = do
   subExp <- toJsonForType t

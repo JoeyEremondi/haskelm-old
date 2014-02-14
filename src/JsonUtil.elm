@@ -53,6 +53,17 @@ stringFromJson (Json.String s) = s
 stringToJson : ToJson String
 stringToJson s = Json.String s
 
+dictFromJson : FromJson a -> FromJson b -> FromJson (Dict.Dict a b)
+dictFromJson keyFrom elemFrom = \(Json.Array tuples) ->
+  unJsonTuples = map (\Json.Array [kj,vj] -> ([keyFrom key, valueFrom v)) dictList 
+  in Json.Array tupleJson
+  
+dictToJson : ToJson a -> ToJson b -> ToJson (Dict a b)
+dictToJsob keyTo elemTo = \dict ->
+  let dictList = toList dict
+  tupleJson = map (\(k,v) -> Json.Array [keyTo key, elemTo v]) dictList 
+  in Json.Array tupleJson
+
 getTag : Json.JsonValue -> String
 getTag (Json.Object dict) = case (Dict.lookup "tag" dict) of
   Just (Json.String s) -> s
