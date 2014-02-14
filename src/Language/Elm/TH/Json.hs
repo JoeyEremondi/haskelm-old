@@ -47,6 +47,29 @@ import qualified Control.Monad.State as S
 applyArgs :: Exp -> [Exp] -> Exp
 applyArgs fun args = foldl (\ accumFun nextArg -> AppE accumFun nextArg) fun args
 
+
+-- | Filter function to test if a dec is a data
+-- Also filters out decs which types that can't be serialized, such as functions
+isData :: Dec -> Bool
+isData dec = (isData' dec) && (canSerial dec) 
+  where
+    isData' DataD{} = True
+    isData' NewtypeD{} = True
+    isData' TySynD{} = True
+    isData' _ = False
+    
+    canSerial (DataD _ _ _ ctors _) = all canSerialCtor ctors
+    canSerial (NewtypeD _ _ _ ctor _) = canSerialCtor ctor
+    canSerial (TySynD _ _ ty) = canSerialType ty
+    --can't serialize if type variables --TODO is this true?
+    canSerial _ = False
+    
+    canSerialCtor (NormalC _ types) = all (canSerialType) (map snd types)
+    canSerialCtor (RecC _ types) = all (canSerialType) (map (\(_,_,c)->c) types)
+    
+    canSerialType (ArrowT) = False
+    canSerialType t = all canSerialType (subTypes t)
+
 --General helper functions
 jsonArgName :: Name
 jsonArgName = mkName "jsonArg"
@@ -54,8 +77,14 @@ jsonArgName = mkName "jsonArg"
 jsonArgPat :: Pat
 jsonArgPat = VarP jsonArgName
 
+jsonArgExp :: Exp
+jsonArgExp = VarE jsonArgName
+
 fromJsonName :: Name -> Name
-fromJsonName name = mkName $ "fromJson_" ++ nameToString name
+fromJsonName name = mkName $ "toJson_" ++ nameToString name
+
+toJsonName :: Name -> Name
+toJsonName name = mkName $ "toJson_" ++ nameToString name
 
 -- | Given a type, and an expression for an argument of type Json
 -- return the expression which applies the proper fromJson function to that expression
@@ -95,6 +124,33 @@ fromMatchForCtor (NormalC name strictTypes) = do
 
 fromMatchForCtor _ = error "TODO implement constructor match generation"
 
-makeFromJson = error "TODO implement making json"
+makeFromJson :: [Dec] -> SQ [Dec]
+makeFromJson allDecs = do
+  let decs = filter isData allDecs
+  mapM fromJsonForDec decs
+  
+  
+  
+  
+  
 
 makeToJson = error "TODO implement making json"
+
+toJsonForType :: Type -> SQ Exp
+toJsonForType t = error "TODO implement toJson for types"
+
+toJsonForDec :: Dec -> SQ Dec
+toJsonForDec dec@(DataD _ name _ ctors _deriving) = do
+  let argPat = jsonArgPat
+  let argExp = jsonArgExp
+  ctorMatches <- mapM toMatchForCtor ctors
+  
+  let fnExp = CaseE jsonArgExp ctorMatches
+  
+  let fnName = toJsonName name
+  let fnBody = NormalB fnExp
+  let fnClause = Clause [argPat] fnBody []
+  return $ FunD fnName [fnClause]
+  
+toMatchForCtor :: Con -> SQ Match
+toMatchForCtor con = error "TODO to matches for ctors"
