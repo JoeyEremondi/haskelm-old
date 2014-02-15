@@ -108,11 +108,12 @@ import qualified Language.Haskell.Exts.Syntax as Exts
 
 data TranslateOptions = Options {
  makeJson :: Bool,
- elmImports :: [String],
+ qualifiedImports :: [String],
+ openImports :: [String],
  moduleName :: String
 }
 
-defaultOptions = Options True [] "Main"
+defaultOptions = Options True [] [] "Main"
 
 
 -- | 'toElm' takes a 'String' module name and a list of Template Haskell declarations
@@ -125,7 +126,9 @@ toElm options decs = do
   let jsonDecs = fromJsonDecs ++ toJsonDecs
   --sumDecs <- evalStateT  (Json.giantSumType decs) Util.defaultState
   elmDecs <- evalStateT  (concat <$> translateDecs (decs ++ jsonDecs)  ) Util.defaultState
-  return $ M.Module [moduleName options] [] (map (\im->(im, Importing [])) $ elmImports options) elmDecs 
+  let importList = map (\im->(im, Importing [])) $ qualifiedImports options
+  let openImportList = map (\im->(im, Hiding [])) $ openImports options
+  return $ M.Module [moduleName options] [] (importList ++ openImportList) elmDecs 
 
 --Single stateful computation to store record state information  
 translateDecs decs = do
