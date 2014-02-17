@@ -157,9 +157,20 @@ fromJsonForType t
 -- Which takes a Json object to a value of that type
 fromJsonForDec :: Dec -> SQ Dec
 
+--Special case: we only have one ctor, so we don't use a tag
+fromJsonForDec dec@(DataD _ name _ [ctor] _deriving) = do
+  Match _pat fnBody _decs <- fromMatchForCtor 1 ctor
+  let argPat = jsonArgPat
+  let fnName = fromJsonName name
+  let fnClause = Clause [argPat] fnBody []
+  return $ FunD fnName [fnClause]
+  
+  
+
 fromJsonForDec dec@(DataD _ name _ ctors _deriving) = do
   let argTagExpression = AppE (VarE $ mkName "JsonUtil.getTag") jsonArgExp
-  ctorMatches <- mapM fromMatchForCtor ctors
+  let numCtors = length ctors
+  ctorMatches <- mapM (fromMatchForCtor numCtors) ctors
   let fnExp = CaseE argTagExpression ctorMatches
   let argPat = jsonArgPat
   let fnName = fromJsonName name
@@ -177,16 +188,16 @@ fromJsonForDec dec@(TySynD name _tyvars ty) = do
   return $ FunD fnName [fnClause]
   
   
-fromMatchForCtor :: Con -> SQ Match
+fromMatchForCtor :: Int -> Con -> SQ Match
 
-fromMatchForCtor (NormalC name strictTypes) = do
+fromMatchForCtor numCtors (NormalC name strictTypes) = do
   let types = map snd strictTypes
   let leftHandSide = LitP $ StringL $ nameToString name
   
   let ctorExp = VarE name
   
   --Exp in TH, list in Haskell
-  contentListExpr <- NormalB <$> unpackContents jsonArgExp
+  contentListExpr <- NormalB <$> unpackContents numCtors jsonArgExp
   
   fromJsonFunctions <- mapM fromJsonForType types
   let intNames = map (("subVar" ++) . show) [1 .. length types]
@@ -204,7 +215,7 @@ fromMatchForCtor (NormalC name strictTypes) = do
   return $ Match leftHandSide rightHandSide []
   
 
-fromMatchForCtor (RecC name vstList) = do
+fromMatchForCtor _numCtors (RecC name vstList) = do
   let nameTypes = map (\(a,_,b)->(nameToString a,b)) vstList
   let matchPat = LitP $ StringL $ nameToString name
   (subNames, subDecs) <- unzip <$> mapM getSubJsonRecord nameTypes
@@ -229,8 +240,8 @@ getSubJsonRecord (field, t) = do
   let subRightHand = NormalB $ AppE funToApply (getVarNamed field)
   return (subName, ValD subLeftHand subRightHand [])
     
-unpackContents :: Exp -> SQ Exp
-unpackContents jsonValue = return $ AppE (VarE $ mkName "JsonUtil.unpackContents") jsonValue
+unpackContents :: Int -> Exp -> SQ Exp
+unpackContents numCtors jsonValue = return $ applyArgs (VarE $ mkName "JsonUtil.unpackContents") [LitE $ IntegerL $ toInteger numCtors, jsonValue]
 
 
   
@@ -286,7 +297,8 @@ toJsonForDec :: Dec -> SQ Dec
 toJsonForDec dec@(DataD _ name _ ctors _deriving) = do
   let argPat = jsonArgPat
   let argExp = jsonArgExp
-  ctorMatches <- mapM toMatchForCtor ctors
+  let numCtors = length ctors 
+  ctorMatches <- mapM (toMatchForCtor numCtors) ctors
   
   let fnExp = CaseE jsonArgExp ctorMatches
   
@@ -307,8 +319,8 @@ toJsonForDec dec@(TySynD name _tyvars ty) = do
 toJsonForDec dec = error $ "Unknown dec type" ++ (show dec)
 
   
-toMatchForCtor :: Con -> SQ Match
-toMatchForCtor (NormalC name strictTypes) = do
+toMatchForCtor :: Int -> Con -> SQ Match
+toMatchForCtor numCtors (NormalC name strictTypes) = do
   let types = map snd strictTypes
   let numStrings = map (("subVar_" ++) . show) [1 .. length types]
   subDataNames <- mapM liftNewName numStrings
@@ -322,12 +334,13 @@ toMatchForCtor (NormalC name strictTypes) = do
   
   let contentsList = ListE $ zipWith AppE toJsonFunctions subDataExprs
   
-  jsonValueExp <- packContents name contentsList
+  jsonValueExp <- packContents numCtors name contentsList
   let rightHandSide = NormalB  jsonValueExp
   
   return $ Match  leftHandSide rightHandSide []
 
-toMatchForCtor (RecC name vstList) = do
+--TODO is there ever a record with 0 args?
+toMatchForCtor _numCtors (RecC name vstList) = do
   let (adtNames, _, types) = unzip3 vstList
   let n = length types
   jsonNames <- nNames n "jsonVar"
@@ -343,6 +356,7 @@ toMatchForCtor (RecC name vstList) = do
 -- | Generate the declaration of a dictionary mapping field names to values
 -- to be used with the JSON Object constructor
 makeRecordDict :: Name -> Name -> [Name] -> SQ Dec
+
 makeRecordDict ctorName dictName jsonNames = do
   let leftSide = VarP dictName
   let jsonExps = map VarE jsonNames
@@ -368,8 +382,8 @@ makeSubJsonRecord (t, adtName, jsonName) = do
   let subRightHand = NormalB $ AppE funToApply (VarE adtName)
   return $ ValD subLeftHand subRightHand []
   
-packContents :: Name -> Exp -> SQ Exp
-packContents name contentList = do
-  return $ applyArgs (VarE $ mkName "JsonUtil.packContents") [LitE $ StringL $ nameToString name, contentList]
+packContents :: Int -> Name -> Exp -> SQ Exp
+packContents numCtors name contentList = do
+  return $ applyArgs (VarE $ mkName "JsonUtil.packContents") [LitE $ IntegerL $ toInteger numCtors, LitE $ StringL $ nameToString name, contentList]
   
   
