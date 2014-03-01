@@ -45,8 +45,8 @@ instance (Pretty def ) => Pretty (Module def) where
                           then P.text $ "import " ++ name 
                           else P.text $ "import " ++ name ++ " as " ++ s
                Importing strs -> (P.text $ "import " ++ name ++ " ") <+> (commaCat $ map P.text strs)
-               Hiding [] -> (P.text $ "import open " ++ name ++ " ")
-               Hiding strs -> (P.text $ "import open " ++ name ++ " ") <+> (commaCat $ map P.text strs)
+               Hiding [] -> (P.text $ "import " ++ name ++ "(..) ")
+               Hiding strs -> (P.text $ "import " ++ name ++ " ") <+> P.parens (commaCat $ map P.text strs)
 
     in P.sep [modPret, importPret, decPret]  
   
