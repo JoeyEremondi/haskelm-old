@@ -715,6 +715,8 @@ getElmName ":"  = "::"
 --Not a change, but lets us search for . in module names
 getElmName "." = "."
 
+getElmName "error" = "Error.raise"
+
 --Specific cases
 getElmName s
     | length partList > 1 = getElmModuleName modul name
@@ -730,7 +732,9 @@ elmHasFunction :: String -> String -> Bool
 elmHasFunction "Dict" s = s `elem` ["empty", "singleton", "insert", "update", "remove", "member", "lookup", "findWithDefault",
                             "union", "intersect", "diff", "keys", "values", "toList", "fromList", "map", "foldl", "foldr"]
 
-elmHasFunction "Json" s = s `elem` ["String", "Number", "Boolean", "Null", "Array", "Object"]                            
+elmHasFunction "Json" s = s `elem` ["String", "Number", "Boolean", "Null", "Array", "Object"]  
+
+elmHasFunction "Error" s = s `elem` ["raise"]                                                      
 
 elmHasFunction _ _ = False   
 
