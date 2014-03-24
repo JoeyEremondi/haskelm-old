@@ -1,50 +1,20 @@
 {-|
+Haskelm: Translate Haskell source-code into Elm source-code
+via Template Haskell.
+
 ## Library
-You can also use Haskelm within a Haskell program, via Template Haskell.
-These functions are delcared in Language.Elm.TH
 
-There are two stages to translation: converting a Haskell file into a list of
-Template Haskell declarations (type DecsQ),
-and translation those declarations.
+The given functions can be used to convert Haskell source code
+into Elm source code.
+For example:
 
-There are 5 ways you can get Haskell declarations
-1. Using TemplateHaskell [d| ... |] brackets
-2. From a string which contains a list of declarations (no `module` or `import` statements)
-3. From a file containin declarations as in (2)
-4. From a string which contains a Haskell module (`module` and `import` statements are discarded but allowed)
-5. From a file containing a module as in (4)
 
-It's reccomended that you use (5) for files which are already in your
-Haskell project, and that whenever you use (4) or (5), you do NOT
-splice the Haskell declarations into your code (see below).
-The imports are ignored, so this is ideal for simply reading in a Haskell
-file which gets compiled into your project (without Template Haskell).
-
-If you would like to simultaneously add Haskell and Elm definitions to
-your project, you should use (1), (2) or (3), since they will read in declarations
-without any import or module statements. You can then use `declareTranslation`
-with `declareHaskell=True` to splice the Haskell definitions in, as well as
-a definition for a variable containing the translated Elm string.
-
-Once you have a list of declarations, you can then translate them into elm.
-To translate them as an expression, use
-
-    elmString1 = $(elmStringExp defaultOptions $ decsFromModuleFile "myfile.hs")
+    elmSource = $(translateToElm defaultOptions "path/to/myFile.hs")
 
 Then, elmString1 will be a String variable which you can use in your Haskell code.
-Note that the Haskell declarations can NOT be spliced into code using this method,
-even if the declareHaskell option is set to True.
+Note that the Haskell functions in the file you give are NOT imported.
+If you would like to use them, you must import them the normal way.
  
-To simultaneously declare Haskell and your translated Elm, use
-  $(declareTranslation defaultOptions $ decsFromFile "mydecs.hs")
-  
-In this case, the Haskell declarations can refer to anything imported by
-the module in which you call declareTranslation. Thus it is reccomended that
-you don't use `decsFromModuleFile` or `decsFromModule`, since any imports will be discarded.
- 
-Note that in either case,
-`defaultOptions` is a record, so you can modify any of its values in the call.
-
 
 ## Translation
 
@@ -54,6 +24,8 @@ and multi-clause function definitions (pattern matching).
 
 Translation of class or instance declarations is not supported, and will not likely be supported in the near future,
 as Elm does not support Type classes.
+However, if your Haskell code contains Class or Instance declarations,
+they will simply be ignored by Haskelm.
 
 Most GHC extensions are unsupported, with the exception of Multi-Way-If statements,
 since they have a direct translation into Elm.
@@ -106,13 +78,28 @@ import Language.Haskell.Meta.Parse
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified Language.Haskell.Exts.Syntax as Exts
 
+-- | Options for how to generate Elm source code
 data TranslateOptions = Options {
+ --
  makeJson :: Bool,
+ -- ^ When true, generates `toJson` and `fromJson` for translated type declarations.
+ -- The format used by the Json is the same as the one used by Data.Aeson.TH.
+ -- This is handy for passing data between a Haskell server and an Elm client.
  qualifiedImports :: [String],
+ -- ^ Each module name given will be imported in Elm by `import Module`
  openImports :: [String],
+ -- ^ Each module name given will be imported in Elm by `import Module (..)`
  moduleName :: String
+ -- ^ The name of the elm module generated. i.e. prepends `module ModuleName` to the generated Elm source.
 }
 
+{- |
+Default options for translation:
+Generates `toJson` and `fromJson` functions,
+has no open or qualified imports, and has
+module name `Main`.
+
+-}
 defaultOptions = Options True [] [] "Main"
 
 
@@ -172,7 +159,14 @@ elmModuleToString (Module [name] exports imports elmDecs ) =
                
     
 
-translateToElm :: TranslateOptions -> String -> ExpQ
+
+-- | Given options for translation, and the file path of a Haskell module,
+-- generate the String literal which is the corresponding Elm source code.
+-- This must be invoked using Template Haskell
+-- For example: 
+--
+-- >  elmSource = $(translateToElm defaultOptions "path/to/myFile.hs")
+translateToElm :: TranslateOptions -> FilePath -> ExpQ
 translateToElm options filePath = do
   decs <- decsFromModuleFile filePath
   elmString <- toElmString options decs
