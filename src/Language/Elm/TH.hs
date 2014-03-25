@@ -1,60 +1,54 @@
-{-|
-Haskelm: Translate Haskell source-code into Elm source-code
-via Template Haskell.
+-- |
+-- Module: Language.Elm.TH
+-- Copyright: (c) 2014 Joey Eremondi
+-- License: BSD3
+-- Maintainer: Joey Eremondi <jmitdase@gmail.com>
+-- Stability: experimental
+-- Portability: portable
+-- 
+-- The given functions can be used to convert Haskell source code
+-- into Elm source code.
+-- 
+-- Example usage:
+-- 
+-- >  elmSource = $(translateToElm defaultOptions "path/to/myFile.hs")
+-- 
+-- Here, `elmString1` will be a String variable which you can use in your Haskell code.
+-- Note that the Haskell functions in the file you give are not imported.
+-- If you would like to use them, you must import them the normal way.
+-- 
+-- Haskelm can currently translate most basic Haskell, including functions, algebraic data types, newtypes, and type synonyms.
+-- Support is now in place for records, guarded-function-bodies, list-ranges, where-declarations, as-patterns, 
+-- and multi-clause function definitions (pattern matching).
+-- 
+-- Translation of class or instance declarations is not supported, and will not likely be supported in the near future,
+-- as Elm does not support Type classes.
+-- However, if your Haskell code contains Class or Instance declarations,
+-- they will simply be ignored by Haskelm.
+-- 
+-- Most GHC extensions are unsupported, with the exception of Multi-Way-If statements,
+-- since they have a direct translation into Elm.
+-- 
+-- 
+-- If JSON deriving is enabled, in addition to translating Haskell functions and types,
+-- Elm functions will be generated to transform data to and from the JSON format.
+-- This follows the format used by Data.Aeson.TH, so you can automatically derive your Haskell JSON definitions.
+-- For a type FOO, the functions `toJson_FOO` and `fromJson_FOO` will be added to the Elm code
+-- Returning and taking values of type Json.JsonValue respectively.
+--
+-- The module contains instances of ToJSON and FromJSON for `Data.Map.Map`
+-- which match the format used by Elm's JsonUtils
+-- 
+-- If you use the JSON functionality, the generated Elm code will depend on the `JsonUtils` library,
+-- which can be obtained from <http://library.elm-lang.org>. 
 
-## Library
-
-The given functions can be used to convert Haskell source code
-into Elm source code.
-For example:
-
-
-    elmSource = $(translateToElm defaultOptions "path/to/myFile.hs")
-
-Then, elmString1 will be a String variable which you can use in your Haskell code.
-Note that the Haskell functions in the file you give are NOT imported.
-If you would like to use them, you must import them the normal way.
- 
-
-## Translation
-
-Haskelm can currently translate most basic Haskell, including functions, algebraic data types, newtypes, and type synonyms.
-Support is now in place for records, guarded-function-bodies, list-ranges, where-declarations, as-patterns, 
-and multi-clause function definitions (pattern matching).
-
-Translation of class or instance declarations is not supported, and will not likely be supported in the near future,
-as Elm does not support Type classes.
-However, if your Haskell code contains Class or Instance declarations,
-they will simply be ignored by Haskelm.
-
-Most GHC extensions are unsupported, with the exception of Multi-Way-If statements,
-since they have a direct translation into Elm.
-
-## Json
-
-Haskelm currently derivies toJson and fromJson functions for all Data declarations.
-To get around the lack of TypeClasses in Elm, each translated module contains a 
-sum type, called BoxedJson, which wraps around any types defined in the module,
-as well as lists, integers, floats, bools, and null.
-
-Values of type `FOO` can be boxed using the constructor `BoxedJsonFOO`.
-This also applies to `Int`, `Float`, and `String`.
-Note that `BoxedJson_List` wraps a list of type `BoxedJson`.
-
-The Haskell versions of these functions will lbe avaliable soon.
-A short-term goal of mine is to switch this format to be compatible with Aeson,
-or to use a more efficient binary serialization format such as BSON
-or Protocol Buffers.
-
-Json translation can be turned off using the options parameter.
-Switching off JSON translations in the Haskelm executable will be supported soon.
-
--}
 
 module Language.Elm.TH
     ( 
     translateToElm,
     TranslateOptions (..),
+    ToJSON (..),
+    FromJSON (..),
     defaultOptions,
 
     ) where
@@ -77,6 +71,8 @@ import Control.Applicative ((<$>))
 import Language.Haskell.Meta.Parse
 import Language.Haskell.Exts.Pretty (prettyPrint)
 import qualified Language.Haskell.Exts.Syntax as Exts
+import Data.Aeson (ToJSON, FromJSON, parseJSON, toJSON, fromJSON)
+import qualified Data.Map
 
 -- | Options for how to generate Elm source code
 data TranslateOptions = Options {
@@ -157,8 +153,6 @@ elmModuleToString (Module [name] exports imports elmDecs ) =
       modString = show $ Pretty.pretty newModule
   in modString              
                
-    
-
 
 -- | Given options for translation, and the file path of a Haskell module,
 -- generate the String literal which is the corresponding Elm source code.
@@ -171,3 +165,13 @@ translateToElm options filePath = do
   decs <- decsFromModuleFile filePath
   elmString <- toElmString options decs
   liftString elmString
+
+
+
+-- | ToJSON instance for Data.Map which matches the format used by Elm's JsonUtils    
+instance (ToJSON a, ToJSON b, Ord a) => ToJSON (Data.Map.Map a b) where
+  toJSON m = toJSON $ Data.Map.toList m
+  
+-- | FromJSON instance for Data.Map which matches the format used by Elm's JsonUtils    
+instance (FromJSON a, FromJSON b, Ord a) => FromJSON (Data.Map.Map a b) where
+  parseJSON json = Data.Map.fromList <$> parseJSON json
